@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: void_user
+      POSTGRES_PASSWORD: void_password
+      POSTGRES_DB: thevoid
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U void_user -d thevoid"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  thevoid:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://void_user:void_password@postgres:5432/thevoid
+      SEED_INITIAL_OBJECT: "true"
+      ALLOWED_ORIGINS: "*"
+
+volumes:
+  pgdata:

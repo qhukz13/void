@@ -1,0 +1,14 @@
+node_modules/
+dist/
+data/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+.env
+.env.local
+*.log
+.DS_Store
+coverage/
+*.geany
+
