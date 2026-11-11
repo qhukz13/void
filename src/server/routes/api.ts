@@ -42,6 +42,15 @@ export async function registerApiRoutes(
 
   app.get<{
     Querystring: {
+      limit?: string;
+    };
+  }>('/api/signals', async (request) => {
+    const limit = request.query.limit !== undefined ? Number(request.query.limit) : 200;
+    return repo.getWorldSignals(Number.isFinite(limit) ? limit : 200);
+  });
+
+  app.get<{
+    Querystring: {
       minX?: string;
       minY?: string;
       maxX?: string;

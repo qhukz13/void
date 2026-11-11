@@ -171,6 +171,68 @@ export function getChunksForBounds(bounds: BoundingBox, maxChunks = 256): string
   return keys;
 }
 
+export interface SectorMarker {
+  key: string;
+  cx: number;
+  cy: number;
+  worldX: number;
+  worldY: number;
+}
+
+/**
+ * Computes the visible procedural sector boundary markers for the current viewport.
+ * At low zoom levels, steps by multiple chunks so the screen never floods with markers.
+ */
+export function getVisibleSectorMarkers(bounds: BoundingBox, zoom: number, maxMarkers = 36): SectorMarker[] {
+  const minCx = coordToChunkIndex(bounds.minX);
+  const maxCx = coordToChunkIndex(bounds.maxX);
+  const minCy = coordToChunkIndex(bounds.minY);
+  const maxCy = coordToChunkIndex(bounds.maxY);
+
+  const spanX = Math.max(1, maxCx - minCx + 1);
+  const spanY = Math.max(1, maxCy - minCy + 1);
+  const step = Math.max(1, Math.ceil(Math.max(spanX, spanY) / 5), zoom < 0.25 ? 4 : zoom < 0.5 ? 2 : 1);
+
+  const startCx = Math.floor(minCx / step) * step;
+  const startCy = Math.floor(minCy / step) * step;
+
+  const markers: SectorMarker[] = [];
+  for (let cx = startCx; cx <= maxCx; cx += step) {
+    for (let cy = startCy; cy <= maxCy; cy += step) {
+      markers.push({
+        key: `${cx}:${cy}`,
+        cx,
+        cy,
+        worldX: cx * CHUNK_SIZE,
+        worldY: cy * CHUNK_SIZE
+      });
+      if (markers.length >= maxMarkers) {
+        return markers;
+      }
+    }
+  }
+  return markers;
+}
+
+/**
+ * Computes sub-pixel-accurate CSS background grid offset using modular arithmetic in world space
+ * first, preventing floating-point precision loss at extreme coordinates (e.g. ±10^12).
+ */
+export function computeInfiniteGridOffset(
+  viewportDimPx: number,
+  cameraCoord: number,
+  zoom: number,
+  worldGridStep: number
+): { gridSizePx: number; offsetPx: number } {
+  const safeZoom = clampZoom(zoom);
+  const gridSizePx = Math.max(16, Math.round(worldGridStep * safeZoom));
+  const effectiveWorldStep = gridSizePx / safeZoom;
+  const modWorld = ((cameraCoord % effectiveWorldStep) + effectiveWorldStep) % effectiveWorldStep;
+  const rawOffset = viewportDimPx / 2 - modWorld * safeZoom;
+  const offsetPx = ((rawOffset % gridSizePx) + gridSizePx) % gridSizePx;
+  return { gridSizePx, offsetPx };
+}
+
 export function distanceSquaredToCenter(
   obj: Pick<VoidObject, 'x' | 'y' | 'width' | 'height'>,
   centerX: number,

@@ -66,6 +66,14 @@ const MIGRATIONS: Array<{ version: string; sql: string }> = [
   {
     version: '001_initial_schema',
     sql: INITIAL_MIGRATION_SQL
+  },
+  {
+    version: '002_infinite_world_bigint_chunks',
+    sql: `
+      ALTER TABLE world_objects
+        ALTER COLUMN chunk_x TYPE BIGINT,
+        ALTER COLUMN chunk_y TYPE BIGINT;
+    `
   }
 ];
 

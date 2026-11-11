@@ -41,21 +41,14 @@ export function CodeEditorSurface({
 
   return (
     <div className="void-code-surface">
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '4px 10px',
-          background: '#090b0f',
-          borderBottom: '1px solid var(--border-hairline)',
-          fontSize: '10px',
-          color: 'var(--text-muted)'
-        }}
-      >
-        <span>
-          {language.toUpperCase()} · {value.length} chars · Ctrl+Enter to run & commit
-        </span>
+      <div className="void-code-toolbar">
+        <div className="void-code-toolbar-meta">
+          <span className="void-lang-pill">{language.toUpperCase()}</span>
+          <span>·</span>
+          <span>{value.length} chars</span>
+          <span>·</span>
+          <span>Ctrl+Enter to commit</span>
+        </div>
         <button
           type="button"
           className="void-mini-btn"
@@ -67,7 +60,7 @@ export function CodeEditorSurface({
       </div>
 
       {!useDirectBuffer && (
-        <div style={{ flex: 1, minHeight: '180px', position: 'relative' }}>
+        <div className="void-monaco-stage">
           <Editor
             height="100%"
             language={language}
@@ -83,7 +76,8 @@ export function CodeEditorSurface({
               wordWrap: 'on',
               tabSize: 2,
               automaticLayout: true,
-              padding: { top: 8, bottom: 8 }
+              renderLineHighlight: 'line',
+              padding: { top: 10, bottom: 10 }
             }}
             onMount={(editor, monacoInstance) => {
               editor.addCommand(
@@ -99,32 +93,18 @@ export function CodeEditorSurface({
         </div>
       )}
 
-      <div
-        style={{
-          height: useDirectBuffer ? '100%' : '96px',
-          flex: useDirectBuffer ? 1 : '0 0 96px',
-          borderTop: useDirectBuffer ? 'none' : '1px solid var(--border-hairline)',
-          display: 'flex',
-          flexDirection: 'column'
-        }}
-      >
+      <div className={`void-buffer-drawer ${useDirectBuffer ? 'is-expanded' : ''}`}>
         {!useDirectBuffer && (
-          <div
-            style={{
-              padding: '2px 10px',
-              background: '#0a0c10',
-              color: 'var(--text-muted)',
-              fontSize: '10px',
-              borderBottom: '1px solid var(--border-hairline)'
-            }}
-          >
-            direct source buffer ({language})
+          <div className="void-buffer-header">
+            <span>direct source buffer ({language})</span>
+            <span>sync active</span>
           </div>
         )}
         <textarea
           className="void-code-fallback-textarea"
           data-testid={`code-editor-${language}`}
           aria-label={`${language} source code`}
+          placeholder={`Write ${language.toUpperCase()} source...`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}

@@ -47,6 +47,8 @@ export function InspectorPanel({
   const [draftY, setDraftY] = useState(String(Math.round(object.y)));
   const [draftW, setDraftW] = useState(String(object.width));
   const [draftH, setDraftH] = useState(String(object.height));
+  const [draftRot, setDraftRot] = useState(String(Math.round(object.rotation)));
+  const [draftZ, setDraftZ] = useState(String(object.zIndex));
   const [isDirty, setIsDirty] = useState(false);
 
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -69,6 +71,8 @@ export function InspectorPanel({
     setDraftY(String(Math.round(object.y)));
     setDraftW(String(object.width));
     setDraftH(String(object.height));
+    setDraftRot(String(Math.round(object.rotation)));
+    setDraftZ(String(object.zIndex));
     setIsDirty(false);
     setSaveState('idle');
     setSaveError(null);
@@ -83,6 +87,8 @@ export function InspectorPanel({
       setDraftY(String(Math.round(object.y)));
       setDraftW(String(object.width));
       setDraftH(String(object.height));
+      setDraftRot(String(Math.round(object.rotation)));
+      setDraftZ(String(object.zIndex));
     }
   }, [
     isDirty,
@@ -93,7 +99,9 @@ export function InspectorPanel({
     object.x,
     object.y,
     object.width,
-    object.height
+    object.height,
+    object.rotation,
+    object.zIndex
   ]);
 
   const loadRevisions = useCallback(async () => {
@@ -144,6 +152,8 @@ export function InspectorPanel({
     const parsedY = Number(draftY);
     const parsedW = Number(draftW);
     const parsedH = Number(draftH);
+    const parsedRot = Number(draftRot);
+    const parsedZ = Number(draftZ);
 
     try {
       await onSaveObject(object.id, {
@@ -153,7 +163,9 @@ export function InspectorPanel({
         x: Number.isFinite(parsedX) ? parsedX : object.x,
         y: Number.isFinite(parsedY) ? parsedY : object.y,
         width: Number.isFinite(parsedW) ? parsedW : object.width,
-        height: Number.isFinite(parsedH) ? parsedH : object.height
+        height: Number.isFinite(parsedH) ? parsedH : object.height,
+        rotation: Number.isFinite(parsedRot) ? parsedRot : object.rotation,
+        zIndex: Number.isFinite(parsedZ) ? parsedZ : object.zIndex
       });
       setIsDirty(false);
       setSaveState('saved');
@@ -216,10 +228,10 @@ export function InspectorPanel({
     <aside className="void-inspector" data-testid="inspector-panel" aria-label="Object Inspector">
       <div className="void-inspector-header">
         <div className="void-inspector-title-row">
-          <div>
+          <div className="void-inspector-identity">
             <span className="void-inspector-id" data-testid="inspector-object-id">
               OBJECT #{object.id.slice(0, 8)}
-            </span>{' '}
+            </span>
             <span className="void-object-rev" data-testid="inspector-object-revision">
               r{object.revision}
             </span>
@@ -236,6 +248,7 @@ export function InspectorPanel({
 
         <div className="void-inspector-timestamps">
           <span>created {formatRelativeTime(object.createdAt, nowMs)}</span>
+          <span>·</span>
           <span>last modified {formatRelativeTime(object.updatedAt, nowMs)}</span>
         </div>
 
@@ -338,6 +351,32 @@ export function InspectorPanel({
             }}
           />
         </div>
+        <div className="void-spatial-field">
+          <label htmlFor="insp-rot">ROT°</label>
+          <input
+            id="insp-rot"
+            type="number"
+            data-testid="inspector-input-rotation"
+            value={draftRot}
+            onChange={(e) => {
+              setDraftRot(e.target.value);
+              setIsDirty(true);
+            }}
+          />
+        </div>
+        <div className="void-spatial-field">
+          <label htmlFor="insp-z">Z-INDEX</label>
+          <input
+            id="insp-z"
+            type="number"
+            data-testid="inspector-input-z"
+            value={draftZ}
+            onChange={(e) => {
+              setDraftZ(e.target.value);
+              setIsDirty(true);
+            }}
+          />
+        </div>
       </div>
 
       <div className="void-tabs" role="tablist">
@@ -349,7 +388,8 @@ export function InspectorPanel({
           data-testid="tab-html"
           onClick={() => setActiveTab('html')}
         >
-          HTML
+          <span>HTML</span>
+          <span className="void-tab-count">{draftHtml.length}</span>
         </button>
         <button
           type="button"
@@ -359,7 +399,8 @@ export function InspectorPanel({
           data-testid="tab-css"
           onClick={() => setActiveTab('css')}
         >
-          CSS
+          <span>CSS</span>
+          <span className="void-tab-count">{draftCss.length}</span>
         </button>
         <button
           type="button"
@@ -369,7 +410,8 @@ export function InspectorPanel({
           data-testid="tab-javascript"
           onClick={() => setActiveTab('javascript')}
         >
-          JS
+          <span>JS</span>
+          <span className="void-tab-count">{draftJs.length}</span>
         </button>
         <button
           type="button"
@@ -379,7 +421,8 @@ export function InspectorPanel({
           data-testid="tab-history"
           onClick={() => setActiveTab('history')}
         >
-          HISTORY (r{object.revision})
+          <span>HISTORY</span>
+          <span className="void-tab-count">r{object.revision}</span>
         </button>
       </div>
 
@@ -426,17 +469,13 @@ export function InspectorPanel({
         {activeTab === 'history' && (
           <div className="void-history-pane" data-testid="history-pane">
             <div className="void-history-notice">
-              OBJECT HISTORY — inspect previous revisions and copy source manually. No automatic restoration exists.
+              OBJECT ARCHAEOLOGY — inspect previous revisions and copy source manually into a new object.
             </div>
-            {historyError && (
-              <div style={{ padding: '8px 12px', color: 'var(--status-fault)', fontSize: '11px' }}>
-                {historyError}
-              </div>
-            )}
+            {historyError && <div className="void-history-error">{historyError}</div>}
             <div className="void-history-split">
               <div className="void-revision-list" data-testid="revision-list">
                 {historyLoading && revisions.length === 0 ? (
-                  <div style={{ padding: '10px', color: 'var(--text-muted)' }}>loading revisions...</div>
+                  <div className="void-history-empty">loading revisions...</div>
                 ) : (
                   revisions.map((rev) => {
                     const verb = rev.eventType === 'created' ? 'created' : 'modified';
@@ -448,10 +487,11 @@ export function InspectorPanel({
                         data-testid={`revision-item-${rev.revision}`}
                         onClick={() => void handleSelectRevision(rev.revision)}
                       >
-                        <div>
-                          <span style={{ color: 'var(--accent-signal)' }}>r{rev.revision}</span> · {rev.eventType}
+                        <div className="void-revision-row-top">
+                          <span className="void-revision-num">r{rev.revision}</span>
+                          <span className={`void-event-badge ${rev.eventType}`}>{rev.eventType}</span>
                         </div>
-                        <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                        <div className="void-revision-row-time">
                           {verb} {formatRelativeTime(rev.createdAt, nowMs)}
                         </div>
                       </button>
@@ -464,11 +504,11 @@ export function InspectorPanel({
                 {selectedRevisionDetail ? (
                   <>
                     <div className="void-revision-actions">
-                      <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        r{selectedRevisionDetail.revision} ({selectedRevisionDetail.eventType}{' '}
-                        {formatRelativeTime(selectedRevisionDetail.createdAt, nowMs)})
+                      <span className="void-revision-summary">
+                        r{selectedRevisionDetail.revision} · {selectedRevisionDetail.eventType}{' '}
+                        {formatRelativeTime(selectedRevisionDetail.createdAt, nowMs)}
                       </span>
-                      <div style={{ display: 'flex', gap: '6px' }}>
+                      <div className="void-revision-btn-group">
                         <button
                           type="button"
                           className="void-btn"
@@ -496,23 +536,30 @@ export function InspectorPanel({
 
                     <div className="void-revision-code-scroll">
                       <div className="void-revision-code-block">
-                        <header>HTML ({selectedRevisionDetail.htmlBytes} bytes)</header>
+                        <header>
+                          <span>HTML</span>
+                          <span className="void-revision-bytes">{selectedRevisionDetail.htmlBytes} bytes</span>
+                        </header>
                         <pre data-testid="history-detail-html">{selectedRevisionDetail.html || '/* empty */'}</pre>
                       </div>
                       <div className="void-revision-code-block">
-                        <header>CSS ({selectedRevisionDetail.cssBytes} bytes)</header>
+                        <header>
+                          <span>CSS</span>
+                          <span className="void-revision-bytes">{selectedRevisionDetail.cssBytes} bytes</span>
+                        </header>
                         <pre data-testid="history-detail-css">{selectedRevisionDetail.css || '/* empty */'}</pre>
                       </div>
                       <div className="void-revision-code-block">
-                        <header>JS ({selectedRevisionDetail.jsBytes} bytes)</header>
+                        <header>
+                          <span>JS</span>
+                          <span className="void-revision-bytes">{selectedRevisionDetail.jsBytes} bytes</span>
+                        </header>
                         <pre data-testid="history-detail-js">{selectedRevisionDetail.javascript || '// empty'}</pre>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <div style={{ padding: '12px', color: 'var(--text-muted)' }}>
-                    select a revision to inspect source code
-                  </div>
+                  <div className="void-history-empty">select a revision to inspect source code</div>
                 )}
               </div>
             </div>
@@ -522,16 +569,7 @@ export function InspectorPanel({
 
       {diagnostics.length > 0 && (
         <div className="void-diagnostics" data-testid="inspector-diagnostics">
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: '4px',
-              color: 'var(--text-muted)',
-              fontSize: '10px'
-            }}
-          >
+          <div className="void-diagnostics-header">
             <span>SANDBOX DIAGNOSTICS ({diagnostics.length})</span>
             <button
               type="button"
@@ -547,8 +585,11 @@ export function InspectorPanel({
               className={`void-diag-item ${d.type !== 'console_log' ? 'error' : ''}`}
               data-testid="inspector-diag-entry"
             >
-              [{d.type}] {d.message}
-              {d.line ? ` (line ${d.line})` : ''}
+              <span className="void-diag-type">{d.type}</span>
+              <span>
+                {d.message}
+                {d.line ? ` (line ${d.line})` : ''}
+              </span>
             </div>
           ))}
         </div>
@@ -569,7 +610,7 @@ export function InspectorPanel({
                   ? 'unsaved local edits — press run / commit'
                   : `synced with world (r${object.revision})`}
         </div>
-        <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+        <div className="void-footer-coords">
           {object.width}×{object.height} @ ({Math.round(object.x)}, {Math.round(object.y)})
         </div>
       </div>

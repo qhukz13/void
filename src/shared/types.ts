@@ -93,6 +93,18 @@ export interface AnonymousCursor {
   updatedAt: number;
 }
 
+export interface WorldSignalBeacon {
+  id: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  chunkX: number;
+  chunkY: number;
+  revision: number;
+  updatedAt: string;
+}
+
 export interface SandboxDiagnostic {
   objectId: string;
   revision: number;

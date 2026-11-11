@@ -272,8 +272,10 @@ export function buildSandboxSrcDoc(params: {
   html: string;
   css: string;
   javascript: string;
+  zoom?: number;
 }): string {
-  const { objectId, revision, html, css, javascript } = params;
+  const { objectId, revision, html, css, javascript, zoom } = params;
+  const initialZoom = typeof zoom === 'number' && Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const instrumented = instrumentUserJavaScript(javascript);
   const safeCss = escapeStyleCloseTag(css);
   const safeUserJs = escapeScriptCloseTag(instrumented.code);
@@ -281,21 +283,127 @@ export function buildSandboxSrcDoc(params: {
   const safeObjectIdJson = JSON.stringify(objectId);
 
   return `<!DOCTYPE html>
-<html>
+<html style="zoom: ${initialZoom};">
 <head>
 <meta charset="utf-8" />
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; media-src data: blob:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none';" />
 <style>
+  :root {
+    color-scheme: dark;
+  }
   *, *::before, *::after { box-sizing: border-box; }
-  html, body {
+  @keyframes __void-blink { 50% { visibility: hidden; } }
+  blink, .blink { animation: __void-blink 1s step-end infinite; }
+  :where(html, body) {
     margin: 0;
     padding: 0;
     width: 100%;
     height: 100%;
-    overflow: hidden;
     background: transparent;
-    color: #e6eaef;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: #f0f0f0;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 13px;
+    line-height: 1.35;
+    text-rendering: geometricPrecision;
+  }
+  :where(body) {
+    padding: 8px;
+    overflow: auto;
+  }
+  :where(h1, h2, h3, h4, h5, h6) {
+    margin: 0 0 6px;
+    color: #ffffff;
+    font-weight: bold;
+    line-height: 1.15;
+  }
+  :where(h1) { font-size: 20px; }
+  :where(h2) { font-size: 16px; }
+  :where(h3) { font-size: 14px; color: #ffb000; }
+  :where(p, ul, ol, dl, blockquote, pre, table, fieldset) {
+    margin: 0 0 8px;
+  }
+  :where(a) {
+    color: #00ffff;
+    text-decoration: underline;
+  }
+  :where(a:visited) { color: #ff66ff; }
+  :where(a:hover, a:active) {
+    background: #ffff00;
+    color: #000000;
+  }
+  :where(hr) {
+    border: 0;
+    border-top: 1px dashed #555555;
+    margin: 8px 0;
+  }
+  :where(code, pre, samp, kbd) {
+    font-family: 'Courier New', Courier, monospace;
+  }
+  :where(code) {
+    color: #00ff66;
+    background: #0a0a0a;
+    padding: 0 3px;
+    border: 1px solid #333333;
+  }
+  :where(pre) {
+    background: #050505;
+    color: #00ff66;
+    border: 1px solid #333333;
+    padding: 6px;
+    overflow-x: auto;
+  }
+  :where(blockquote) {
+    border-left: 2px solid #ffb000;
+    padding-left: 8px;
+    color: #cccccc;
+  }
+  :where(button, input[type="button"], input[type="submit"], input[type="reset"]) {
+    background: #1a1a1a;
+    color: #f0f0f0;
+    border: 2px outset #666666;
+    padding: 2px 8px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  :where(button:active, input[type="button"]:active, input[type="submit"]:active, input[type="reset"]:active) {
+    border-style: inset;
+  }
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]):not([type="reset"]), textarea, select) {
+    background: #000000;
+    color: #00ff66;
+    border: 1px solid #666666;
+    padding: 2px 5px;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  :where(input:focus, textarea:focus, select:focus, button:focus-visible) {
+    outline: 1px dotted #ffff00;
+  }
+  :where(table) {
+    border-collapse: collapse;
+    width: 100%;
+  }
+  :where(th, td) {
+    border: 1px solid #555555;
+    padding: 3px 6px;
+    text-align: left;
+  }
+  :where(th) {
+    background: #141414;
+    color: #ffb000;
+  }
+  :where(fieldset) {
+    border: 1px solid #555555;
+    padding: 6px 8px;
+  }
+  :where(legend) {
+    color: #ffb000;
+    padding: 0 4px;
+  }
+  :where(img, canvas, svg, video) {
+    max-width: 100%;
+    image-rendering: pixelated;
   }
 </style>
 <style id="void-user-style">${safeCss}</style>
@@ -318,6 +426,15 @@ ${html}
   let halted = false;
 
   const nativePostMessage = window.parent ? window.parent.postMessage.bind(window.parent) : null;
+
+  window.addEventListener('message', function(ev) {
+    try {
+      const d = ev && ev.data;
+      if (d && d.source === 'THE_VOID_HOST' && d.type === 'SET_ZOOM' && typeof d.zoom === 'number' && d.zoom > 0) {
+        document.documentElement.style.zoom = String(d.zoom);
+      }
+    } catch (_) {}
+  });
 
   function sendToEngine(type, message, extra) {
     if (!nativePostMessage) return;

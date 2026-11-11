@@ -30,7 +30,8 @@ import type {
   ObjectRevisionSummary,
   RevisionEventType,
   UpdateObjectInput,
-  VoidObject
+  VoidObject,
+  WorldSignalBeacon
 } from '../../shared/types.js';
 import type { ServerConfig } from '../config.js';
 import type { DatabaseAdapter } from '../db/adapter.js';
@@ -207,6 +208,54 @@ export class ObjectRepository {
       'SELECT COUNT(*) AS count FROM world_objects WHERE deleted = FALSE'
     );
     return Number(res.rows[0]?.count ?? 0);
+  }
+
+  async getWorldSignals(limit = 200): Promise<{
+    signals: WorldSignalBeacon[];
+    totalActiveObjects: number;
+    activeSectors: number;
+  }> {
+    const safeLimit = Math.max(1, Math.min(500, Math.floor(limit)));
+    const [signalsRes, statsRes] = await Promise.all([
+      this.db.query<
+        Pick<
+          WorldObjectRow,
+          'id' | 'x' | 'y' | 'width' | 'height' | 'chunk_x' | 'chunk_y' | 'revision' | 'updated_at'
+        >
+      >(
+        `SELECT id, x, y, width, height, chunk_x, chunk_y, revision, updated_at
+         FROM world_objects
+         WHERE deleted = FALSE
+         ORDER BY updated_at DESC
+         LIMIT $1`,
+        [safeLimit]
+      ),
+      this.db.query<{ total_objects: string | number; total_sectors: string | number }>(
+        `SELECT
+           COUNT(*) AS total_objects,
+           COUNT(DISTINCT (chunk_x::text || ':' || chunk_y::text)) AS total_sectors
+         FROM world_objects
+         WHERE deleted = FALSE`
+      )
+    ]);
+
+    const signals: WorldSignalBeacon[] = signalsRes.rows.map((r) => ({
+      id: r.id,
+      x: Number(r.x),
+      y: Number(r.y),
+      width: Number(r.width),
+      height: Number(r.height),
+      chunkX: Number(r.chunk_x),
+      chunkY: Number(r.chunk_y),
+      revision: Number(r.revision),
+      updatedAt: toIsoString(r.updated_at)
+    }));
+
+    return {
+      signals,
+      totalActiveObjects: Number(statsRes.rows[0]?.total_objects ?? signals.length),
+      activeSectors: Number(statsRes.rows[0]?.total_sectors ?? 0)
+    };
   }
 
   async getRegionObjects(bounds: BoundingBox, requestedLimit?: number): Promise<VoidObject[]> {
@@ -649,50 +698,80 @@ export class ObjectRepository {
       width: 360,
       height: 260,
       html: `<div class="origin-beacon">
-  <div class="coords">0, 0</div>
-  <p>unowned programmable space</p>
-  <button id="mut">emit signal</button>
+  <pre class="ascii">+----------------------------+
+|     THE VOID // (0, 0)     |
++----------------------------+</pre>
+  <p>unmoderated programmable space. raw html / css / js.</p>
+  <hr />
+  <div class="row">
+    <button id="mut">PING [0]</button>
+    <span id="sig-readout" class="sig">LIVE</span>
+  </div>
 </div>`,
       css: `body {
   margin: 0;
-  height: 100vh;
+  padding: 10px;
+  height: 100%;
   display: grid;
   place-items: center;
-  background: #090b0e;
-  color: #e6eaef;
-  font-family: ui-monospace, monospace;
+  background: #000000;
+  color: #f0f0f0;
+  font-family: 'Courier New', Courier, monospace;
 }
 .origin-beacon {
-  text-align: center;
-  padding: 1.25rem;
-  border: 1px solid #262c36;
+  width: 100%;
+  padding: 10px;
+  background: #080808;
+  border: 1px solid #555555;
+  box-shadow: 3px 3px 0 #1b1b1b;
 }
-.coords {
-  font-size: 1.5rem;
-  letter-spacing: 0.15em;
-  color: #c8a24e;
-  margin-bottom: 0.5rem;
+.ascii {
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.15;
+  color: #ffb000;
 }
 p {
-  font-size: 0.75rem;
-  color: #7d8794;
-  margin: 0 0 1rem;
+  font-size: 12px;
+  color: #b8b8b8;
+  margin: 0 0 8px;
+}
+hr {
+  border: 0;
+  border-top: 1px dashed #444444;
+  margin: 8px 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 button {
-  background: transparent;
-  color: #e6eaef;
-  border: 1px solid #384152;
-  padding: 0.4rem 0.8rem;
+  background: #141414;
+  color: #00ff66;
+  border: 1px solid #00ff66;
+  padding: 4px 10px;
   font-family: inherit;
-  font-size: 0.75rem;
+  font-size: 12px;
+  font-weight: bold;
   cursor: pointer;
+}
+button:hover {
+  background: #00ff66;
+  color: #000000;
+}
+.sig {
+  font-size: 11px;
+  color: #00ff66;
 }`,
       javascript: `const btn = document.getElementById('mut');
+const sig = document.getElementById('sig-readout');
 let pulses = 0;
 if (btn) {
   btn.addEventListener('click', () => {
     pulses += 1;
-    btn.textContent = 'signal ' + pulses;
+    btn.textContent = 'PING [' + pulses + ']';
+    if (sig) sig.textContent = 'ACK #' + pulses;
   });
 }`
     });

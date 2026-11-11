@@ -75,7 +75,7 @@ describe('Infrastructure Security, Validation, Origin Checks, and Abuse Protecti
       method: 'POST',
       url: '/api/objects',
       payload: {
-        x: 999_999_999,
+        x: 9_999_999_999_999,
         y: 0
       }
     });

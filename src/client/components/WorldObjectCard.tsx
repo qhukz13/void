@@ -13,7 +13,12 @@ interface WorldObjectCardProps {
   object: VoidObject;
   selected: boolean;
   sandboxActive: boolean;
+  cameraX: number;
+  cameraY: number;
   cameraZoom: number;
+  viewportWidth: number;
+  viewportHeight: number;
+  frameless: boolean;
   diagnostics: SandboxDiagnostic[];
   nowMs: number;
   onSelect: (objectId: string) => void;
@@ -29,7 +34,12 @@ export function WorldObjectCard({
   object,
   selected,
   sandboxActive,
+  cameraX,
+  cameraY,
   cameraZoom,
+  viewportWidth,
+  viewportHeight,
+  frameless,
   diagnostics,
   nowMs,
   onSelect,
@@ -166,14 +176,20 @@ export function WorldObjectCard({
       ? `modified ${formatRelativeTime(object.updatedAt, nowMs)}`
       : `created ${formatRelativeTime(object.createdAt, nowMs)}`;
 
+  // Position and size directly in integer-snapped screen pixels (no CSS scale() bitmap blur)
+  const screenX = Math.round(viewportWidth / 2 + (object.x - cameraX) * cameraZoom);
+  const screenY = Math.round(viewportHeight / 2 + (object.y - cameraY) * cameraZoom);
+  const screenW = Math.max(64, Math.round(object.width * cameraZoom));
+  const screenH = Math.max(48, Math.round(object.height * cameraZoom));
+
   return (
     <div
-      className={`void-object-card ${selected ? 'is-selected' : ''} ${latestFault ? 'has-fault' : ''}`}
+      className={`void-object-card ${frameless ? 'is-frameless' : ''} ${selected ? 'is-selected' : ''} ${latestFault ? 'has-fault' : ''}`}
       style={{
-        left: `${object.x}px`,
-        top: `${object.y}px`,
-        width: `${object.width}px`,
-        height: `${object.height}px`,
+        left: `${screenX}px`,
+        top: `${screenY}px`,
+        width: `${screenW}px`,
+        height: `${screenH}px`,
         zIndex: selected ? 100000 : object.zIndex,
         transform: object.rotation ? `rotate(${object.rotation}deg)` : undefined
       }}
@@ -192,9 +208,13 @@ export function WorldObjectCard({
         onPointerUp={handleHeaderPointerUp}
       >
         <div className="void-object-meta">
+          <span
+            className={`void-object-led ${latestFault ? 'fault' : sandboxActive ? '' : 'dormant'}`}
+            title={latestFault ? 'Sandbox fault' : sandboxActive ? 'Active sandbox' : 'Dormant sandbox'}
+          />
           <span className="void-object-id">#{object.id.slice(0, 6)}</span>
           <span className="void-object-rev">r{object.revision}</span>
-          <span>{timeLabel}</span>
+          <span className="void-object-time">{timeLabel}</span>
           {latestFault && (
             <span className="void-object-fault-badge" data-testid={`object-fault-badge-${object.id}`}>
               FAULT
@@ -245,6 +265,7 @@ export function WorldObjectCard({
         <SandboxFrame
           object={object}
           active={sandboxActive}
+          cameraZoom={cameraZoom}
           onDiagnostic={onDiagnostic}
           onClearDiagnostics={onClearDiagnostics}
         />

@@ -6,7 +6,8 @@ import type {
   ObjectRevisionSummary,
   ServerWsMessage,
   UpdateObjectInput,
-  VoidObject
+  VoidObject,
+  WorldSignalBeacon
 } from '../../shared/types.js';
 
 export type ConnectionState = 'connecting' | 'online' | 'reconnecting' | 'offline';
@@ -152,6 +153,22 @@ export class VoidApiClient {
     }
     const data = (await res.json()) as { objects: VoidObject[] };
     return data.objects;
+  }
+
+  async fetchWorldSignals(): Promise<{
+    signals: WorldSignalBeacon[];
+    totalActiveObjects: number;
+    activeSectors: number;
+  }> {
+    const res = await fetch('/api/signals?limit=200');
+    if (!res.ok) {
+      throw new Error(`Failed to load world signals (${res.status})`);
+    }
+    return (await res.json()) as {
+      signals: WorldSignalBeacon[];
+      totalActiveObjects: number;
+      activeSectors: number;
+    };
   }
 
   async fetchObject(id: string, includeDeleted = false): Promise<VoidObject | null> {

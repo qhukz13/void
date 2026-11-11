@@ -11,11 +11,13 @@ import {
   boxesIntersect,
   clampCoord,
   clampZoom,
+  computeInfiniteGridOffset,
   coordToChunkIndex,
   formatDeepLinkSearch,
   formatRelativeTime,
   getChunksForBounds,
   getViewportBounds,
+  getVisibleSectorMarkers,
   parseDeepLinkParams,
   screenToWorld,
   worldToScreen,
@@ -55,13 +57,25 @@ describe('Infinite World Spatial Model & Coordinates', () => {
   it('handles large positive and negative coordinates near world limits without instability', () => {
     const farPositive = clampCoord(WORLD_MAX_COORD - 500);
     const farNegative = clampCoord(WORLD_MIN_COORD + 500);
-    expect(farPositive).toBe(9_999_500);
-    expect(farNegative).toBe(-9_999_500);
+    expect(farPositive).toBe(WORLD_MAX_COORD - 500);
+    expect(farNegative).toBe(WORLD_MIN_COORD + 500);
 
     expect(clampCoord(WORLD_MAX_COORD + 999999)).toBe(WORLD_MAX_COORD);
     expect(clampCoord(WORLD_MIN_COORD - 999999)).toBe(WORLD_MIN_COORD);
     expect(clampCoord(Number.NaN)).toBe(0);
     expect(clampZoom(-5)).toBe(1.0);
+
+    // Verify floating-origin modular grid offset stays bounded at astronomical coordinates
+    const gridAtBillion = computeInfiniteGridOffset(1440, 850_000_000_000, 1.0, 128);
+    expect(gridAtBillion.gridSizePx).toBe(128);
+    expect(gridAtBillion.offsetPx).toBeGreaterThanOrEqual(0);
+    expect(gridAtBillion.offsetPx).toBeLessThan(128);
+
+    // Verify procedural sector lattice generation at distant coordinates
+    const farBounds = getViewportBounds({ x: 500_000_000, y: -500_000_000, zoom: 1 }, 1280, 800, 0.35);
+    const sectors = getVisibleSectorMarkers(farBounds, 1.0);
+    expect(sectors.length).toBeGreaterThan(0);
+    expect(sectors[0].worldX).toBe(sectors[0].cx * 2048);
   });
 
   it('computes chunk indices and bounding box intersections across chunk boundaries', () => {
@@ -190,5 +204,21 @@ describe('Sandbox Isolation & Untrusted Code Instrumentation', () => {
     expect(srcdoc).toContain('<\\/style>');
     expect(srcdoc).toContain('<\\/script>');
     expect(srcdoc).toContain('nativeQueueMicrotask');
+  });
+
+  it('supports native vector zoom and raw early-internet defaults inside sandboxed iframes', () => {
+    const srcdoc = buildSandboxSrcDoc({
+      objectId: 'obj-zoom',
+      revision: 1,
+      html: '<blink>RAW</blink>',
+      css: '',
+      javascript: '',
+      zoom: 3.5
+    });
+
+    expect(srcdoc).toContain('<html style="zoom: 3.5;">');
+    expect(srcdoc).toContain("d.source === 'THE_VOID_HOST' && d.type === 'SET_ZOOM'");
+    expect(srcdoc).toContain('image-rendering: pixelated');
+    expect(srcdoc).toContain('void-blink');
   });
 });

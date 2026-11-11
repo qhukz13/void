@@ -5,6 +5,7 @@ import type { SandboxDiagnostic, VoidObject } from '../../shared/types.js';
 interface SandboxFrameProps {
   object: VoidObject;
   active: boolean;
+  cameraZoom: number;
   onDiagnostic: (diag: SandboxDiagnostic) => void;
   onClearDiagnostics: (objectId: string) => void;
 }
@@ -12,10 +13,13 @@ interface SandboxFrameProps {
 export function SandboxFrame({
   object,
   active,
+  cameraZoom,
   onDiagnostic,
   onClearDiagnostics
 }: SandboxFrameProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const zoomRef = useRef<number>(cameraZoom);
+  zoomRef.current = cameraZoom;
 
   const srcDoc = useMemo(() => {
     if (!active) return '';
@@ -24,9 +28,27 @@ export function SandboxFrame({
       revision: object.revision,
       html: object.html,
       css: object.css,
-      javascript: object.javascript
+      javascript: object.javascript,
+      zoom: zoomRef.current
     });
   }, [active, object.id, object.revision, object.html, object.css, object.javascript]);
+
+  // Synchronize native vector zoom inside the sandboxed iframe without reloading or bitmap-scaling
+  useEffect(() => {
+    if (!active) return;
+    const win = iframeRef.current?.contentWindow;
+    if (!win) return;
+    try {
+      win.postMessage(
+        {
+          source: 'THE_VOID_HOST',
+          type: 'SET_ZOOM',
+          zoom: cameraZoom
+        },
+        '*'
+      );
+    } catch (_) {}
+  }, [active, cameraZoom]);
 
   useEffect(() => {
     if (!active) return;
@@ -79,9 +101,9 @@ export function SandboxFrame({
   if (!active) {
     return (
       <div className="void-dormant-placeholder" data-testid={`sandbox-dormant-${object.id}`}>
-        <div>DORMANT SANDBOX</div>
-        <div>
-          {object.width}×{object.height} · r{object.revision}
+        <div className="void-dormant-badge">[SANDBOX DORMANT // ZOOM IN]</div>
+        <div className="void-dormant-meta">
+          {object.width}x{object.height} · r{object.revision} · ({Math.round(object.x)}, {Math.round(object.y)})
         </div>
       </div>
     );
@@ -97,6 +119,18 @@ export function SandboxFrame({
       srcDoc={srcDoc}
       title={`void-object-${object.id}`}
       data-testid={`sandbox-iframe-${object.id}`}
+      onLoad={() => {
+        try {
+          iframeRef.current?.contentWindow?.postMessage(
+            {
+              source: 'THE_VOID_HOST',
+              type: 'SET_ZOOM',
+              zoom: zoomRef.current
+            },
+            '*'
+          );
+        } catch (_) {}
+      }}
     />
   );
 }
